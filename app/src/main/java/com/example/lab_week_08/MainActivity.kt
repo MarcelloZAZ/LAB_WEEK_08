@@ -12,6 +12,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.work.*
 import com.example.lab_week_08.worker.FirstWorker
 import com.example.lab_week_08.worker.SecondWorker
+import com.example.lab_week_08.worker.ThirdWorker
 
 class MainActivity : AppCompatActivity() {
 
@@ -28,7 +29,7 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        // ✅ Permission notifikasi (wajib di Android 13+)
+        // Request izin notifikasi (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED
@@ -37,55 +38,56 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 🔗 Buat constraint agar hanya jalan jika ada koneksi internet
         val networkConstraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
         val id = "001"
 
-        // 🧱 Request untuk FirstWorker
         val firstRequest = OneTimeWorkRequest.Builder(FirstWorker::class.java)
             .setConstraints(networkConstraints)
             .setInputData(getIdInputData(FirstWorker.INPUT_DATA_ID, id))
             .build()
 
-        // 🧱 Request untuk SecondWorker
         val secondRequest = OneTimeWorkRequest.Builder(SecondWorker::class.java)
             .setConstraints(networkConstraints)
             .setInputData(getIdInputData(SecondWorker.INPUT_DATA_ID, id))
             .build()
 
-        // 🔁 Jalankan urutan worker: First → Second
-        workManager.beginWith(firstRequest).then(secondRequest).enqueue()
+        val thirdRequest = OneTimeWorkRequest.Builder(ThirdWorker::class.java)
+            .setConstraints(networkConstraints)
+            .setInputData(getIdInputData(ThirdWorker.INPUT_DATA_ID, id))
+            .build()
 
-        // 🔍 Observasi hasil dari worker pertama
+        // Urutan proses: First → Second → Third
+        workManager.beginWith(firstRequest).then(secondRequest).then(thirdRequest).enqueue()
+
         workManager.getWorkInfoByIdLiveData(firstRequest.id).observe(this) { info ->
-            if (info.state.isFinished) {
-                showResult("First process is done")
-            }
+            if (info.state.isFinished) showResult("First process is done")
         }
 
-        // 🔍 Observasi hasil dari worker kedua
         workManager.getWorkInfoByIdLiveData(secondRequest.id).observe(this) { info ->
             if (info.state.isFinished) {
                 showResult("Second process is done")
-                // 🚀 Panggil NotificationService setelah worker kedua selesai
                 launchNotificationService()
+            }
+        }
+
+        workManager.getWorkInfoByIdLiveData(thirdRequest.id).observe(this) { info ->
+            if (info.state.isFinished) {
+                showResult("Third process is done")
+                launchSecondNotificationService()
             }
         }
     }
 
-    // 🔧 Fungsi untuk mengirim data ke worker
     private fun getIdInputData(idKey: String, idValue: String) =
         Data.Builder().putString(idKey, idValue).build()
 
-    // 🔔 Tampilkan hasil ke user
     private fun showResult(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
-    // 🚀 Jalankan NotificationService (Foreground Service)
     private fun launchNotificationService() {
         NotificationService.trackingCompletion.observe(this) { Id ->
             showResult("Process for Notification Channel ID $Id is done!")
@@ -93,6 +95,18 @@ class MainActivity : AppCompatActivity() {
 
         val serviceIntent = android.content.Intent(this, NotificationService::class.java).apply {
             putExtra(NotificationService.EXTRA_ID, "001")
+        }
+
+        ContextCompat.startForegroundService(this, serviceIntent)
+    }
+
+    private fun launchSecondNotificationService() {
+        SecondNotificationService.trackingCompletion.observe(this) { Id ->
+            showResult("Final process for Channel ID $Id is done!")
+        }
+
+        val serviceIntent = android.content.Intent(this, SecondNotificationService::class.java).apply {
+            putExtra(SecondNotificationService.EXTRA_ID, "002")
         }
 
         ContextCompat.startForegroundService(this, serviceIntent)

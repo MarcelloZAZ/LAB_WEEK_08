@@ -9,7 +9,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 
-class NotificationService : Service() {
+class SecondNotificationService : Service() {
 
     private lateinit var notificationBuilder: NotificationCompat.Builder
     private lateinit var serviceHandler: Handler
@@ -19,11 +19,9 @@ class NotificationService : Service() {
     override fun onCreate() {
         super.onCreate()
 
-        // Buat notifikasi
         notificationBuilder = startForegroundService()
 
-        // Buat thread kedua untuk jalankan proses background
-        val handlerThread = HandlerThread("SecondThread").apply { start() }
+        val handlerThread = HandlerThread("ThirdThread").apply { start() }
         serviceHandler = Handler(handlerThread.looper)
     }
 
@@ -32,8 +30,6 @@ class NotificationService : Service() {
         val channelId = createNotificationChannel()
 
         val builder = getNotificationBuilder(pendingIntent, channelId)
-
-        // Jalankan notifikasi foreground
         startForeground(NOTIFICATION_ID, builder.build())
         return builder
     }
@@ -49,8 +45,8 @@ class NotificationService : Service() {
 
     private fun createNotificationChannel(): String {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channelId = "001"
-            val channelName = "001 Channel"
+            val channelId = "002"
+            val channelName = "002 Channel"
             val channelPriority = NotificationManager.IMPORTANCE_DEFAULT
 
             val channel = NotificationChannel(channelId, channelName, channelPriority)
@@ -64,14 +60,14 @@ class NotificationService : Service() {
 
     private fun getNotificationBuilder(pendingIntent: PendingIntent, channelId: String) =
         NotificationCompat.Builder(this, channelId)
-            .setContentTitle("Second worker process is done")
-            .setContentText("Check it out!")
+            .setContentTitle("Third worker process is done")
+            .setContentText("Final check in progress...")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentIntent(pendingIntent)
-            .setTicker("Second worker process is done, check it out!")
+            .setTicker("Final process is running...")
             .setOngoing(true)
 
-    // Tambahkan kode lifecycle berikut
+    // Lifecycle callback saat service dijalankan
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val returnValue = super.onStartCommand(intent, flags, startId)
 
@@ -79,7 +75,7 @@ class NotificationService : Service() {
             ?: throw IllegalStateException("Channel ID must be provided")
 
         serviceHandler.post {
-            countDownFromTenToZero(notificationBuilder)
+            countDown(notificationBuilder)
             notifyCompletion(Id)
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -88,11 +84,11 @@ class NotificationService : Service() {
         return returnValue
     }
 
-    private fun countDownFromTenToZero(notificationBuilder: NotificationCompat.Builder) {
+    private fun countDown(notificationBuilder: NotificationCompat.Builder) {
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        for (i in 10 downTo 0) {
+        for (i in 5 downTo 0) {
             Thread.sleep(1000L)
-            notificationBuilder.setContentText("$i seconds until last warning")
+            notificationBuilder.setContentText("$i seconds before finish")
                 .setSilent(true)
             notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build())
         }
@@ -105,7 +101,7 @@ class NotificationService : Service() {
     }
 
     companion object {
-        const val NOTIFICATION_ID = 0xCA7
+        const val NOTIFICATION_ID = 0xFA7
         const val EXTRA_ID = "Id"
 
         private val mutableID = MutableLiveData<String>()
